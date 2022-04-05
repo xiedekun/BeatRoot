@@ -1,3 +1,11 @@
+########################
+# Code Author: Dekun Xie
+# BeatRoot Algorithm for Beat-Tracking from Simon Dixon (2001) 
+# ' Dixon, S. (2001). 
+# Automatic extraction of tempo and beat from expressive performances. 
+# International Journal of Phytoremediation, 21(1), 39–58.'
+########################
+
 import numpy as np
 import librosa
 import IPython.display as ipd
