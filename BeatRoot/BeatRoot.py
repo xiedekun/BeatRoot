@@ -8,12 +8,9 @@
 
 import numpy as np
 import librosa
-import IPython.display as ipd
 import matplotlib.pyplot as plt
 from scipy.signal import medfilt
 from scipy.ndimage import maximum_filter1d as maxfilt
-import os
-import mir_eval
 
 # Tempo Induction Stage: Onset Detection
 
@@ -194,11 +191,11 @@ def agentsProcess(peakTimes, salience, clusters, number=5) -> Agent:
 
     # mainloop
     print('Agent Mainloop...')
-    timeOut = 2
-    tolPostRatio = 0.2 # default 0.4
-    tolPreRatio = 0.1 # default 0.2
-    tolInner = 0.04
-    correctionFactor = 5 # how many beats to change tempo
+    timeOut = 1
+    tolPostRatio = 0.8 # default 0.4
+    tolPreRatio = 0.5 # default 0.2
+    tolInner = 0.01
+    correctionFactor = 4 # how many beats to change tempo
 
     for j, event in enumerate(peakTimes):
         for i, agent in enumerate(agents):
@@ -226,79 +223,11 @@ def agentsProcess(peakTimes, salience, clusters, number=5) -> Agent:
         print(round(agent.beatInterval,4),len(agent.history),round(agent.score,4))
     return agents
 
-    # Evaluate part
-
-# addCowbellAndPlot and getAnnotationsFromFile are referred to https://github.com/JZacaroli/Beat-Tracking
-
-def addCowbellAndPlot(fileName, bestAgent, annotions=None):
-    """ Add a cowbell sound to the file on the beat times of the best agent.
-        fileName (string): path of audio file
-        bestAgent (Agent): the agent which performed best in the beat tracking algorithm.
-        this part is referred to https://github.com/JZacaroli/Beat-Tracking"""
-    print('adding cowbell...')
-    cowbell = librosa.load(os.path.join('data/cowbell/Cowbell.wav'))
-    plt.figure(figsize=(14,3))
-    plt.title('Waveform and beats for ' + fileName + '\nBPM: ' + "{:.1f}".format(60/(bestAgent.beatInterval)))
-    snd, rate = librosa.load(os.path.join(fileName))
-    cowbell, cbRate = librosa.load(os.path.join('data/cowbell/Cowbell.wav'))
-    t = np.arange(len(snd))/rate
-    plt.plot(t, snd)
-    
-    if annotions is not None:
-        for beat in annotions:
-            plt.vlines(beat, -2, 2, color='r')
-    
-    for beat in bestAgent.history:
-        plt.vlines(beat, -2, 2, color='k')
-        if int(beat*rate)+len(cowbell) < len(snd):
-            #Add the cowbell sound if there's space in the file.
-            snd[int(beat*rate):int(beat*rate)+len(cowbell)] = snd[int(beat*rate):int(beat*rate)+len(cowbell)] + cowbell
-
-    ipd.display(ipd.Audio(snd,rate=rate))
-    
-def getAnnotationsFromFile(annotationsFile):
-    f = open(annotationsFile, 'r')
-    contents = f.read()
-    annotations = []
-    for line in contents.split('\n'):
-        lineList = line.split()
-        if len(lineList)>0:
-            annotations += [float(lineList[0])]
-    f.close()
-    return np.array(annotations)
-    
-def getBestBeat(agents, annotation, minBeatTime=5.0, fMeasureThreshold=0.1):
-    print('Evaluate Precision...', '\n')
-    annotation = mir_eval.beat.trim_beats(annotation, min_beat_time=minBeatTime)
-    highestAgentIndex = 0
-    highestScore = 0
-    for i in range(len(agents)):
-        bestAgent = np.array(agents[i].history)
-        bestAgent = mir_eval.beat.trim_beats(bestAgent, min_beat_time=minBeatTime)
-        matching = mir_eval.util.match_events(annotation, bestAgent, fMeasureThreshold)
-        precision = float(len(matching))/len(bestAgent)
-        f_measure = mir_eval.beat.f_measure(annotation, bestAgent, f_measure_threshold=fMeasureThreshold)
-        
-        if precision > highestScore:
-            highestScore = precision
-            highestAgentIndex = i
-        print(f'Agent{i}')
-        print(f'Precision {round(precision* 100,2)}%' )
-        print('F-measure', round(f_measure,4), '\n')
-    print(f'Agent{highestAgentIndex} is the best!', '\n')
-    return agents[highestAgentIndex]
-
 def beatTracker(fileName):
-    peakTimes, gSalience = onsetDetection(fileName, salienceToOne=True)
+    peakTimes, gSalience = onsetDetection(fileName, salienceToOne=False)
     clusters = clustering(peakTimes)
     agents = agentsProcess(peakTimes, gSalience, clusters)
     return agents[0].history
-
-def evaluate(agents, fileName):
-    gAnnotationsFile = fileName[:-4] + '.beats'
-    gAnnotation = getAnnotationsFromFile(gAnnotationsFile)
-    gBestBeats = getBestBeat(agents, gAnnotation)
-    addCowbellAndPlot(fileName,gBestBeats,gAnnotation)
 
 if __name__ == '__main__':
     fileName = 'data/Albums-Ballroom_Classics4-14.wav'
