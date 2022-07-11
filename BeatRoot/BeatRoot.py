@@ -17,7 +17,7 @@ import mir_eval
 
 # Tempo Induction Stage: Onset Detection
 
-def onsetDetection(fileName, windowTime=0.04, hopRatio=0.25, wd=21, thr=0.01):
+def onsetDetection(fileName, windowTime=0.04, hopRatio=0.25, wd=21, thr=0.01, salienceToOne=False):
     '''
         Using Spectral Flux to dectect onsets
         parameter:
@@ -69,7 +69,9 @@ def onsetDetection(fileName, windowTime=0.04, hopRatio=0.25, wd=21, thr=0.01):
     peakIndices = np.nonzero(medFiltODF >= threshold)
     peakTimes = peakIndices[0] * hopTime
     salience = odf[peakIndices]
-    # salience[:] = 1
+
+    if salienceToOne:
+        salience[:] = 1
     
     t = np.arange(len(odf)) * hopTime
     plt.figure(figsize=(14,3))
@@ -93,9 +95,9 @@ class Cluster:
         self.interval = np.mean(self.IOIs)
         self.score = 0
         
-    def addIOIs(self, IOI):
+    def addIOIs(self, IOI, size=1):
         self.IOIs += IOI
-        self.size += 1
+        self.size += size
         self.interval = np.mean(self.IOIs)
     
 def relationshipFactor(d):
@@ -123,10 +125,7 @@ def clustering(peakTimes, number=10) -> Cluster:
             if event1 == event2:
                 break # remove 0 value; I think this better
             IOI = [np.abs(event1 - event2)]
-
             isAdded = False
-            if len(clusters) == 0:
-                clusters.append(Cluster(IOI))
             for cluster in clusters:
                 if np.abs(cluster.interval - IOI) < clusterWidth:
                     cluster.addIOIs(IOI)
@@ -137,7 +136,7 @@ def clustering(peakTimes, number=10) -> Cluster:
     for cluster1 in clusters:
         for cluster2 in clusters:
             if cluster1 != cluster2 and np.abs(cluster1.interval - cluster2.interval) < clusterWidth:
-                cluster1.addIOIs(cluster2.IOIs)
+                cluster1.addIOIs(cluster2.IOIs, cluster2.size)
                 clusters.remove(cluster2)
 
     for cluster1 in clusters:
@@ -290,16 +289,16 @@ def getBestBeat(agents, annotation, minBeatTime=5.0, fMeasureThreshold=0.1):
     return agents[highestAgentIndex]
 
 def beatTracker(fileName):
-    peakTimes, gSalience = onsetDetection(fileName)
+    peakTimes, gSalience = onsetDetection(fileName, salienceToOne=True)
     clusters = clustering(peakTimes)
     agents = agentsProcess(peakTimes, gSalience, clusters)
+    return agents[0].history
 
-    # Evaluate
+def evaluate(agents, fileName):
     gAnnotationsFile = fileName[:-4] + '.beats'
     gAnnotation = getAnnotationsFromFile(gAnnotationsFile)
     gBestBeats = getBestBeat(agents, gAnnotation)
     addCowbellAndPlot(fileName,gBestBeats,gAnnotation)
-    return gBestBeats.history
 
 if __name__ == '__main__':
     fileName = 'data/Albums-Ballroom_Classics4-14.wav'
