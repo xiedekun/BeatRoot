@@ -26,6 +26,9 @@ Digital Audio Effects (Vol. 120, pp. 133-137).
 
 ## Code
 
+**Note**: The parameter in code has been adjust slightly after finishing the report.
+
+
 **Jupyter**:
 ```python
 BeatRoot.ipynb
